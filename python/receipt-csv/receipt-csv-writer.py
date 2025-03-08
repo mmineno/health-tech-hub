@@ -11,7 +11,8 @@ from pdf2image import convert_from_path
 # .envファイルから環境変数を読み込む
 load_dotenv()
 
-MODEL_ID = "claude-3-haiku-20240307"
+# MODEL_ID = "claude-3-haiku-20240307"
+MODEL_ID = "claude-3-5-sonnet-20241022"
 
 # Anthropic APIの設定
 API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -21,7 +22,7 @@ if not API_KEY:
 client = anthropic.Anthropic(api_key=API_KEY)
 
 # 入力/出力の設定
-INPUT_FOLDER = "./ryoshusho-202411"
+INPUT_FOLDER = "./ryoshusho-202501"
 OUTPUT_CSV = "output.csv"
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf"}
 MAX_FILE_SIZE_MB = 2.5
@@ -39,27 +40,18 @@ PROMPT_TEMPLATE = """
 - 取引先: 領収書に記載された店舗名または発行元の名称 (例: "株式会社ABC商事", "セブンイレブン〇〇店")
 - 税込金額: 領収書に記載された合計金額（例: 1234, 小数点なし）
 - 摘要: 領収書の内容を要約した説明 (例: "昼食代", "交通費", "文房具購入")
-- インボイス登録番号: "T"で始まる14桁番号 (例: T12345678901234)、存在しない場合は"なし"
-- 注意: 「ヘルステックハブ株式会社」は当社の法人名であり、取引先としては出力しない
+- インボイス登録番号: "T"で始まる13桁番号 (例: T1234567890123)、存在しない場合は"なし"
 - 仕訳: 以下の候補から選択: {accounts}
 
 出力例:
-{
+{{
     "発生日": "2023/12/31",
     "取引先": "株式会社ABC商事",
     "税込金額": 1234,
     "摘要": "文房具購入",
     "インボイス登録番号": "T1234567890123",
     "仕訳": "消耗品費"
-},
-{
-    "発生日": "2024/2/1",
-    "取引先": "東海旅客鉄道株式会社",
-    "税込金額": 6560,
-    "摘要": "JR乗車券類",
-    "インボイス登録番号": "T3180001031569",
-    "仕訳": "旅費交通費"
-}
+}}
 """
 
 # 既存のCSVファイルを読み込み
@@ -221,6 +213,7 @@ for i, filename in enumerate(os.listdir(INPUT_FOLDER)):
     try:
         pil_images = extract_images(file_path, dpi=150)
         for idx, pil_img in enumerate(pil_images, start=1):
+            file_id_for_csv = f"{filename}_page{idx}" if ext == ".pdf" else filename
 
             process_image_data(
                 pil_img=pil_img,

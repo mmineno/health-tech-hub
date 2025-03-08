@@ -1,0 +1,76 @@
+## 2024/1/21
+ - micsからの期待値
+ - 引き継ぎ内容
+  - 入金消込が残っているがAICROで完結
+  - カルテ確定後の編集履歴
+ - スケジュール
+
+AICROさん
+
+
+Claudeで画像を読み込んでCSVを出力するPythonのスクリプトを生成する
+読み込む画像は領収書（レシート）
+会計ソフトに読み込ませるためのCSV
+指定したフォルダ内の画像ファイルを1枚ずつ読み込む
+
+CSVの項目は以下
+発生日,取引先,税込金額,摘要,インボイス登録番号,仕訳,ファイル名
+
+仕訳は以下のいずれか
+ - 通信費
+ - 旅費交通費
+ - 会議費
+ - 交際費
+ - 租税公課
+ - 消耗品費
+ - 支払手数料
+
+インボイス登録番号は「T + 13桁の番号」で表記される
+適用は内容から会計で一般的なものを想定し出力する
+画像ファイル以外のファイルは対象外
+
+<サンプルのスクリプト>
+import anthropic
+import base64
+
+# Anthropic APIクライアントの初期化
+client = anthropic.Anthropic()
+
+# 画像ファイルをbase64エンコード
+with open("image.jpg", "rb") as image_file:
+    image_data = base64.b64encode(image_file.read()).decode('utf-8')
+
+# APIリクエストの作成
+message = client.messages.create(
+    model="claude-3-opus-20240229",
+    max_tokens=1024,
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": image_data,
+                    },
+                },
+                {
+                    "type": "text",
+                    "text": "この画像を説明してください。"
+                }
+            ],
+        }
+    ],
+)
+
+# 応答の出力
+print(message.content)
+</サンプルのスクリプト>
+
+miup
+現状把握
+9月からBDで1,000万円の債務超過
+野口さんの支払いを後ろ倒ししたものがあった
+

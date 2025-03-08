@@ -23,7 +23,7 @@ client = anthropic.Anthropic(api_key=API_KEY)
 MODEL_ID = "claude-3-7-sonnet-20250219"
 
 # フォルダ・ファイル設定
-INPUT_FOLDER = "./領収書-2024-個人"  # 領収書画像/ PDFの格納フォルダ
+INPUT_FOLDER = "/Users/mmineno/develop/project/health-tech-hub/領収書-2024-個人"  # 領収書画像/ PDFの格納フォルダ
 OUTPUT_CSV = "output.csv"            # 結果CSVファイルのパス
 ERROR_LOG_FILE = "error_log.txt"     # エラー記録用ファイル
 
@@ -76,7 +76,7 @@ PROMPT_TEMPLATE = """
 8. "インボイス登録番号": 領収書に記載があれば (T＋13桁)。なければ "なし"
 
 【JSON出力例】
-{
+{{
   "発生日": "2025/01/31",
   "取引先": "株式会社ABC商事",
   "勘定科目": "消耗品費",
@@ -85,7 +85,7 @@ PROMPT_TEMPLATE = """
   "消費税額": 109,
   "摘要": "文房具購入",
   "インボイス登録番号": "T1234567890123"
-}
+}}
 
 必ず上記のキーをすべて含むJSONを出力してください。
 """.strip()
@@ -94,6 +94,7 @@ def log_error(error_message: str):
     """
     エラーをログファイルに書き込むユーティリティ
     """
+    print(f"エラー: {error_message}")
     with open(ERROR_LOG_FILE, "a", encoding="utf-8") as error_log:
         error_log.write(f"{error_message}\n")
 
@@ -180,6 +181,7 @@ def process_image_data(
 
     # Anthropicへメッセージ送信
     try:
+        print(f"APIリクエスト開始: モデル={model_id}, 画像サイズ={len(image_data)/1024:.1f}KB")
         message = client.messages.create(
             model=model_id,
             max_tokens=2048,
@@ -193,7 +195,24 @@ def process_image_data(
                 }
             ],
         )
+        print("APIリクエスト完了: レスポンス受信")
+        
+        # レスポンスの詳細をデバッグ表示
+        print(f"レスポンスタイプ: {type(message.content)}")
+        if isinstance(message.content, list):
+            print(f"レスポンス要素数: {len(message.content)}")
+            for i, content in enumerate(message.content):
+                print(f"要素{i}のタイプ: {type(content)}")
+                if hasattr(content, 'text'):
+                    print(f"要素{i}のテキスト先頭: {content.text[:50]}...")
+        elif isinstance(message.content, str):
+            print(f"レスポンス先頭: {message.content[:50]}...")
+            
     except Exception as e:
+        print(f"APIリクエストエラー: {e}")
+        print(f"エラータイプ: {type(e)}")
+        import traceback
+        traceback.print_exc()
         log_error(f"APIリクエストエラー: {file_id_for_csv}\n{e}")
         return
 
@@ -206,12 +225,25 @@ def process_image_data(
         log_error(f"予期しないレスポンス形式: {file_id_for_csv}\n{message}")
         return
 
+    print(f"解析対象のテキスト: {raw_content[:100]}...")
+    
     try:
+        # JSONの開始と終了位置を探す
         start_idx = raw_content.find("{")
         end_idx = raw_content.rfind("}") + 1
-        json_str = raw_content[start_idx:end_idx] if start_idx != -1 and end_idx != -1 else ""
+        
+        if start_idx == -1 or end_idx <= 0:
+            print(f"JSONの開始・終了タグが見つかりません。テキスト全体: {raw_content}")
+            raise ValueError("JSONの開始・終了タグが見つかりません")
+            
+        json_str = raw_content[start_idx:end_idx]
+        print(f"抽出したJSON文字列: {json_str[:100]}...")
+        
         result_data = json.loads(json_str)
+        print("JSON解析成功")
     except Exception as e:
+        print(f"JSON解析エラー: {e}")
+        print(f"解析対象テキスト全体: {raw_content}")
         log_error(f"JSON解析エラー: {file_id_for_csv}\n{e}\nレスポンス: {raw_content}")
         return
 
@@ -225,7 +257,7 @@ def process_image_data(
         "消費税額": result_data.get("消費税額", ""),
         "摘要": result_data.get("摘要", ""),
         "インボイス登録番号": result_data.get("インボイス登録番号", "なし"),
-        "ファイル名": file_id_for_csv,
+        "ファイル名": os.path.basename(file_id_for_csv),  # パスからファイル名のみを抽出
     }
 
     # CSVへ追記
@@ -246,25 +278,47 @@ def main():
         raise ValueError(f"入力フォルダが存在しません: {INPUT_FOLDER}")
 
     # 既存のCSVをチェックし、重複を防ぐ
+    processed_files = set()
     if os.path.exists(OUTPUT_CSV):
-        processed_files = pd.read_csv(OUTPUT_CSV, encoding="utf-8-sig")["ファイル名"].unique().tolist()
+        try:
+            # CSVからファイル名を読み込む
+            df = pd.read_csv(OUTPUT_CSV, encoding="utf-8-sig")
+            
+            # 既存データのファイル名をすべて取得
+            if "ファイル名" in df.columns:
+                for file_name in df["ファイル名"].unique():
+                    # フルパスの場合はそのまま、ファイル名のみの場合はファイル名のセットに追加
+                    if os.path.isabs(file_name):
+                        processed_files.add(file_name)
+                    else:
+                        # ファイル名のみの場合は、元のファイル名だけをメモリに保持
+                        processed_files.add(os.path.basename(file_name))
+            
+            print(f"既存CSVから{len(processed_files)}件の処理済みファイル情報を読み込みました")
+        except Exception as e:
+            print(f"CSVの読み込み中にエラーが発生しました: {e}")
+            # エラーの場合は空のセットで続行
+            processed_files = set()
     else:
-        processed_files = []
+        print("既存のCSVが見つかりません。新規作成します。")
 
     file_count = 0
+    processed_count = 0
 
     # os.walk で再帰的にファイルを探索
     for root, dirs, files in os.walk(INPUT_FOLDER):
-        for filename in files:
+        # ファイルをソートして名前順に処理
+        for filename in sorted(files):
             ext = os.path.splitext(filename)[1].lower()
             if ext not in SUPPORTED_EXTENSIONS:
                 continue
 
             file_path = os.path.join(root, filename)
+            file_basename = os.path.basename(file_path)
 
-            # 同じファイル名(厳密にはパス)が既に処理済みであればスキップ
-            if filename in processed_files:
-                print(f"スキップ: {filename} (既に処理済み)")
+            # ファイル名とフルパスの両方で重複チェック
+            if file_basename in processed_files or file_path in processed_files:
+                print(f"スキップ: {file_path} (既に処理済み)")
                 continue
 
             file_count += 1
@@ -284,12 +338,15 @@ def main():
                         model_id=MODEL_ID
                     )
 
-                processed_files.append(filename)
+                # 処理したファイルを記録（ファイル名のみと完全パスの両方）
+                processed_files.add(file_basename)
+                processed_files.add(file_path)
+                processed_count += 1
 
             except Exception as e:
                 log_error(f"ファイル処理エラー: {file_path}\n{e}")
 
-    print("処理が完了しました。")
+    print(f"処理が完了しました。合計{file_count}件のファイルをスキャンし、{processed_count}件の新規ファイルを処理しました。")
 
 if __name__ == "__main__":
     main()

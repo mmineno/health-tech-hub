@@ -124,10 +124,10 @@ VALID_ACCOUNTS = {
 def validate_date(date_str):
     """日付形式を検証"""
     try:
-        datetime.strptime(date_str, '%Y/%m/%d')
-        return True
+        date_obj = datetime.strptime(date_str, '%Y/%m/%d')
+        return True, date_obj.strftime('%Y/%m/%d')  # 正規化された日付を返す
     except ValueError:
-        return False
+        return False, None
 
 def validate_amount(amount_str):
     """金額が数値かどうかを検証"""
@@ -166,7 +166,8 @@ def convert_csv(input_file, output_file):
                 error_count += 1
                 continue
                 
-            if not validate_date(row["発生日"]):
+            is_valid_date, normalized_date = validate_date(row["発生日"])
+            if not is_valid_date:
                 print(f"エラー（行 {i}）: 発生日の形式が無効です。YYYY/MM/DD形式で指定してください。")
                 error_count += 1
                 continue
@@ -199,7 +200,7 @@ def convert_csv(input_file, output_file):
             new_row["識別フラグ"] = "2000"  # 1行の仕訳データ
             new_row["伝票No"] = ""
             new_row["決算"] = ""
-            new_row["取引日付"] = row["発生日"]
+            new_row["取引日付"] = normalized_date
             
             # 勘定科目の種類を確認
             account_type = VALID_ACCOUNTS[account]
@@ -260,14 +261,28 @@ def convert_csv(input_file, output_file):
             摘要 = row.get("摘要", "")
             
             # インボイス情報がある場合は摘要に追加
-            if "インボイス登録番号" in row and row["インボイス登録番号"].strip():
+            if "インボイス登録番号" in row and row["インボイス登録番号"].strip() and row["インボイス登録番号"].lower() != "なし":
                 invoice_num = row["インボイス登録番号"]
-                if 摘要:
-                    摘要 = f"{摘要} [インボイス:{invoice_num}]"
+                
+                # インボイス番号が短すぎる場合（例：「T」だけ）は追加しない
+                if len(invoice_num) <= 1:
+                    new_row["摘要"] = 摘要[:30]  # 30文字制限
                 else:
-                    摘要 = f"インボイス:{invoice_num}"
+                    invoice_text = f"[インボイス:{invoice_num}]"
+                    
+                    # インボイス情報を含めた長さが30文字を超える場合は摘要を切り詰め
+                    # ただし、摘要が極端に短くならないようにバランスを取る
+                    if len(摘要) + len(invoice_text) + 1 > 30:  # +1はスペース分
+                        # 摘要とインボイス情報の両方が見えるようにバランスよく分配
+                        # 摘要に最低10文字は確保する
+                        max_desc_len = max(10, 30 - len(invoice_text) - 1)
+                        摘要 = 摘要[:max_desc_len]
+                    
+                    摘要 = f"{摘要} {invoice_text}" if 摘要 else invoice_text
+                    new_row["摘要"] = 摘要[:30]  # 30文字制限
+            else:
+                new_row["摘要"] = 摘要[:30]  # 30文字制限
             
-            new_row["摘要"] = 摘要[:30]  # 30文字制限
             new_row["番号"] = ""
             new_row["期日"] = ""
             new_row["タイプ"] = ""
@@ -276,8 +291,11 @@ def convert_csv(input_file, output_file):
             new_row["付箋1"] = "0"  # 指定なし
             new_row["付箋2"] = ""
             new_row["調整"] = ""
-            new_row["借方取引先名"] = row.get("取引先", "")[:15]  # 15文字制限
-            new_row["貸方取引先名"] = row.get("取引先", "")[:15]  # 15文字制限
+            
+            # 取引先名を15文字以内に制限
+            取引先名 = row.get("取引先", "")[:15]  # 15文字制限
+            new_row["借方取引先名"] = 取引先名
+            new_row["貸方取引先名"] = 取引先名
             
             output_rows.append(new_row)
         
@@ -290,8 +308,8 @@ def convert_csv(input_file, output_file):
             return False
         
         # 出力CSVの書き込み
-        with codecs.open(output_file, 'w', 'shift_jis', errors='replace') as f:
-            writer = csv.DictWriter(f, fieldnames=header)
+        with codecs.open(output_file, 'w', 'utf-8', errors='replace') as f:
+            writer = csv.DictWriter(f, fieldnames=header, quoting=csv.QUOTE_ALL)
             writer.writeheader()
             writer.writerows(output_rows)
         

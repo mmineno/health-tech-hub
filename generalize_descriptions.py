@@ -34,9 +34,21 @@ def generalize_description(description, account_type, creditor_name=None, debtor
     if "証紙切手引受" in description or "切手" in description or "郵便" in description:
         return "郵便料金"
     
+    # ホテル関連の摘要を出張宿泊費に変換
+    hotel_keywords = ["ホテル", "宿泊", "HOTEL", "hotel"]
+    for keyword in hotel_keywords:
+        if keyword in description:
+            return "出張宿泊費"
+    
     # ヨドバシカメラが取引先の場合は全て書籍代に変換
     if (creditor_name and "ヨドバシ" in creditor_name) or (debtor_name and "ヨドバシ" in debtor_name):
         return "書籍代"
+    
+    # GIFT KIOSKやJR東海リテイリングが取引先の場合は接待贈答費に変換
+    gift_shop_keywords = ["GIFT KIOSK", "JR東海リテイリング"]
+    for keyword in gift_shop_keywords:
+        if (creditor_name and keyword in creditor_name) or (debtor_name and keyword in debtor_name):
+            return "接待贈答費"
     
     # AIツール関連の摘要をAI使用料に変換
     ai_tools = ["Claude", "ChatGPT", "GitHub", "OpenAI", "AI"]

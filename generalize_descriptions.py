@@ -126,8 +126,9 @@ def process_csv(input_file, output_file):
         with open(input_file, 'r', encoding='utf-8') as f_in, \
              open(output_file, 'w', encoding='utf-8', newline='') as f_out:
             
-            reader = csv.reader(f_in, quotechar='"')
-            writer = csv.writer(f_out, quotechar='"', quoting=csv.QUOTE_ALL)
+            # クォーテーションを保持するために設定
+            reader = csv.reader(f_in, quotechar='"', doublequote=True)
+            writer = csv.writer(f_out, quotechar='"', quoting=csv.QUOTE_ALL, doublequote=True)
             
             # ヘッダーの読み込みと書き込み
             header = next(reader)
@@ -147,6 +148,9 @@ def process_csv(input_file, output_file):
                     
                     # 変換した摘要を設定
                     row[16] = generalized_description
+                    
+                    # 貸方税金額を空にする
+                    row[15] = ""  # 貸方税金額は16列目（インデックスは15）
                 
                 # 処理した行を書き込み
                 writer.writerow(row)

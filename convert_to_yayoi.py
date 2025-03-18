@@ -21,14 +21,14 @@ def convert_bank_statement_to_yayoi(input_file, output_file):
     # 空白のレコードを初期化
     default_record = {header: "" for header in headers}
     default_record["識別フラグ"] = "2000"
-    default_record["借方税金額"] = "0"
-    default_record["貸方税金額"] = "0"
+    default_record["借方税金額"] = ""
+    default_record["貸方税金額"] = ""
     
     # 特定の取引先名の変換ルール
     company_name_mapping = {
         "ゲノメデイア(カ": "genomedia株式会社",
-        "株式会社ミユ-プ": "株式会社miup",
-        "株式会社ミユープ": "株式会社miup"
+        "株式会社ミユ-プ": "株式会社 miup",
+        "株式会社ミユープ": "株式会社 miup"
     }
     
     # 取引データを格納するリスト
@@ -46,7 +46,7 @@ def convert_bank_statement_to_yayoi(input_file, output_file):
             record = default_record.copy()
             
             # 基本情報を設定
-            record["取引日付"] = row['年月日'].replace('/', '')
+            record["取引日付"] = row['年月日']  # スラッシュをそのまま保持
             
             # 取引内容から取引先名を抽出・整形
             取引先 = row.get('お取り扱い内容', '')
@@ -78,8 +78,24 @@ def convert_bank_statement_to_yayoi(input_file, output_file):
                 record["借方金額"] = 出金額
                 record["貸方勘定科目"] = "普通預金"
                 record["貸方金額"] = 出金額
-                record["借方取引先名"] = 取引先
-                record["貸方取引先名"] = 取引先
+                
+                # 売掛金の場合の特別処理
+                if record["借方勘定科目"] == "売掛金":
+                    record["借方取引先名"] = ""
+                    # 取引先名の設定
+                    取引先名 = ""
+                    if "genomedia株式会社" in 取引先:
+                        取引先名 = "genomedia株式会社"
+                    elif "株式会社miup" in 取引先:
+                        取引先名 = "株式会社miup"
+                    else:
+                        取引先名 = 取引先
+                    
+                    record["貸方取引先名"] = 取引先名
+                    record["貸方補助科目"] = 取引先名
+                else:
+                    record["借方取引先名"] = 取引先
+                    record["貸方取引先名"] = 取引先
             
             # 入金の場合（貸方に設定）
             else:
@@ -87,15 +103,31 @@ def convert_bank_statement_to_yayoi(input_file, output_file):
                 record["貸方金額"] = 入金額
                 record["借方勘定科目"] = "普通預金"
                 record["借方金額"] = 入金額
-                record["借方取引先名"] = 取引先
-                record["貸方取引先名"] = 取引先
+                
+                # 売掛金の場合の特別処理
+                if record["貸方勘定科目"] == "売掛金":
+                    record["借方取引先名"] = ""
+                    # 取引先名の設定
+                    取引先名 = ""
+                    if "genomedia株式会社" in 取引先:
+                        取引先名 = "genomedia株式会社"
+                    elif "株式会社miup" in 取引先:
+                        取引先名 = "株式会社miup"
+                    else:
+                        取引先名 = 取引先
+                    
+                    record["貸方取引先名"] = 取引先名
+                    record["貸方補助科目"] = 取引先名
+                else:
+                    record["借方取引先名"] = 取引先
+                    record["貸方取引先名"] = 取引先
             
             # 処理済みのレコードをリストに追加
             output_records.append(record)
     
     # 弥生会計形式でCSVファイルを書き出す
     with open(output_file, 'w', encoding='utf-8', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=headers)
+        writer = csv.DictWriter(f, fieldnames=headers, quoting=csv.QUOTE_ALL)
         writer.writeheader()
         writer.writerows(output_records)
     

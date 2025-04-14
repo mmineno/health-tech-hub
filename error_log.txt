@@ -4,3 +4,4 @@ Error tokenizing data. C error: Expected 19 fields in line 243, saw 28
 CSVの読み込みエラー: output.csv
 Error tokenizing data. C error: Expected 19 fields in line 243, saw 28
 
+APIリクエストエラー (GO領収書_20250214_1100.pdf): Error code: 500 - {'type': 'error', 'error': {'type': 'api_error', 'message': 'Internal server error'}}

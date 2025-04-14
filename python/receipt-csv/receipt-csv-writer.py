@@ -12,7 +12,8 @@ from pdf2image import convert_from_path
 load_dotenv()
 
 # MODEL_ID = "claude-3-haiku-20240307"
-MODEL_ID = "claude-3-5-sonnet-20241022"
+# MODEL_ID = "claude-3-5-sonnet-20241022"
+MODEL_ID = "claude-3-7-sonnet-20250219"
 
 # Anthropic APIの設定
 API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -22,7 +23,7 @@ if not API_KEY:
 client = anthropic.Anthropic(api_key=API_KEY)
 
 # 入力/出力の設定
-INPUT_FOLDER = "./ryoshusho-202501"
+INPUT_FOLDER = "./ryoshusho-202502"
 OUTPUT_CSV = "output.csv"
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf"}
 MAX_FILE_SIZE_MB = 2.5

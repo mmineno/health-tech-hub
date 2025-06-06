@@ -23,7 +23,7 @@ if not API_KEY:
 client = anthropic.Anthropic(api_key=API_KEY)
 
 # 入力/出力の設定
-INPUT_FOLDER = "/Users/mmineno/develop/project/health-tech-hub/ryoshusho/ryoshusho-202503"
+INPUT_FOLDER = "/Users/mmineno/develop/project/health-tech-hub/ryoshusho/ryoshusho-202504"
 OUTPUT_CSV = "output.csv"
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf"}
 MAX_FILE_SIZE_MB = 2.5
